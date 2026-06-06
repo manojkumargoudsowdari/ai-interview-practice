@@ -75,7 +75,7 @@ def get_llm_health() -> LLMHealthResponse:
 
     base_url = _clean_base_url(settings.ollama_base_url)
     try:
-        with httpx.Client(timeout=5) as client:
+        with httpx.Client(timeout=settings.llm_timeout_seconds) as client:
             response = client.get(f"{base_url}/api/tags")
             response.raise_for_status()
     except httpx.HTTPError as exc:
