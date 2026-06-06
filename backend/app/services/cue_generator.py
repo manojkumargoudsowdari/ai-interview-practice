@@ -7,6 +7,8 @@ def generate_cues(
     job_description: str | None = None,
 ) -> CueGenerationResponse:
     q = question.lower()
+    context = f"{resume_context or ''} {job_description or ''}".lower()
+    has_context = bool(context.strip())
 
     if "spark" in q or "pyspark" in q or "optimize" in q:
         cues = ["Spark UI", "shuffle", "partitioning", "skew", "AQE", "file size", "result"]
@@ -31,6 +33,16 @@ def generate_cues(
     else:
         cues = ["direct answer", "project example", "tools", "challenge", "solution", "impact"]
         direction = "Answer using a project-based structure and avoid generic statements."
+
+    if has_context:
+        if "databricks" in context and "Databricks" not in cues:
+            cues.append("Databricks")
+        if "spark" in context and "Spark" not in cues and "Spark UI" not in cues:
+            cues.append("Spark")
+        if "azure" in context and "Azure" not in cues:
+            cues.append("Azure")
+        if "lead" in context or "senior" in context:
+            cues.append("senior ownership")
 
     return CueGenerationResponse(
         question=question,

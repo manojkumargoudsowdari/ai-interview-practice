@@ -1,0 +1,5 @@
+Sample Resume
+
+Candidate: Practice User
+Experience: Senior data engineer with Spark, Databricks, Delta Lake, SQL, Python, and production data pipelines.
+Projects: Optimized Spark jobs, improved data quality checks, and supported Azure-based analytics workflows.

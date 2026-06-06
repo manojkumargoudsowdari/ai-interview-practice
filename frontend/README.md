@@ -2,6 +2,8 @@
 
 React + TypeScript frontend for the AI Interview Practice App.
 
+The UI supports backend health checks, question detection, resume/JD context upload, cue generation, and answer scoring.
+
 ## Run
 
 Start the FastAPI backend first at `http://127.0.0.1:8000`.

@@ -40,6 +40,12 @@ docker-compose.override.yml
 *.pid
 *.log
 
+# Local uploaded/private practice data
+backend/data/uploads/*
+backend/data/processed/*
+!backend/data/uploads/.gitkeep
+!backend/data/processed/.gitkeep
+
 # OS files
 .DS_Store
 Thumbs.db
