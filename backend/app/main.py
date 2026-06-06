@@ -7,6 +7,7 @@ from app.schemas import (
     AnswerScoringResponse,
     CueGenerationRequest,
     CueGenerationResponse,
+    LLMHealthResponse,
     PracticeContextRequest,
     PracticeContextResponse,
     QuestionDetectionResponse,
@@ -20,12 +21,12 @@ from app.services.context_store import (
     update_job_description_context,
     update_resume_context,
 )
-from app.services.cue_generator import generate_cues
 from app.services.document_processor import (
     DocumentProcessingError,
     process_text_payload,
     process_uploaded_file,
 )
+from app.services.llm_service import generate_interview_cues, get_llm_health
 from app.services.question_detector import detect_question
 from app.services.scoring import score_answer
 
@@ -61,11 +62,16 @@ def generate_cues_api(request: CueGenerationRequest):
     resume_context = request.resume_context or context.get("resume_text") or None
     job_description = request.job_description or context.get("job_description_text") or None
 
-    return generate_cues(
+    return generate_interview_cues(
         question=request.question,
         resume_context=resume_context,
         job_description=job_description,
     )
+
+
+@app.get("/llm/health", response_model=LLMHealthResponse)
+def llm_health_api():
+    return get_llm_health()
 
 
 @app.post("/score-answer", response_model=AnswerScoringResponse)

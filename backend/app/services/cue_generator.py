@@ -1,10 +1,13 @@
 from app.schemas import CueGenerationResponse
 
 
-def generate_cues(
+def generate_rule_based_cues(
     question: str,
     resume_context: str | None = None,
     job_description: str | None = None,
+    provider: str = "mock",
+    risk_flags: list[str] | None = None,
+    follow_up_questions: list[str] | None = None,
 ) -> CueGenerationResponse:
     q = question.lower()
     context = f"{resume_context or ''} {job_description or ''}".lower()
@@ -48,4 +51,19 @@ def generate_cues(
         question=question,
         cue_points=cues,
         short_direction=direction,
+        risk_flags=risk_flags or [],
+        follow_up_questions=follow_up_questions or [],
+        provider=provider,
+    )
+
+
+def generate_cues(
+    question: str,
+    resume_context: str | None = None,
+    job_description: str | None = None,
+) -> CueGenerationResponse:
+    return generate_rule_based_cues(
+        question=question,
+        resume_context=resume_context,
+        job_description=job_description,
     )

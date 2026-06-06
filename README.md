@@ -69,6 +69,27 @@ Extracted resume and job description context is saved under `backend/data/proces
 
 These files are ignored by Git so private resumes and job descriptions are not committed.
 
+## LLM Cue Generation
+
+Cue generation defaults to the local mock/rule-based provider.
+
+To use Ollama for local LLM-backed cue generation:
+
+```powershell
+ollama pull llama3.1:8b
+```
+
+Set `backend/.env`:
+
+```env
+LLM_PROVIDER=ollama
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.1:8b
+LLM_TIMEOUT_SECONDS=60
+```
+
+Restart the backend after changing `.env`.
+
 ## Run With Docker
 
 Docker support currently covers the backend service.
