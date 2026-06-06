@@ -1,12 +1,45 @@
-.venv/
+# Python
 __pycache__/
 *.py[cod]
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.coverage
+htmlcov/
 
-backend/.env
+# Node / frontend
+node_modules/
+dist/
+build/
+.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment files
 .env
+.env.*
+backend/.env
+frontend/.env
+!.env.example
 
+# VS Code
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Docker / local runtime
+docker-compose.override.yml
+*.pid
+*.log
+
+# OS files
 .DS_Store
 Thumbs.db
