@@ -10,6 +10,16 @@ The backend provides:
 
 The frontend provides a simple practice UI for calling those APIs.
 
+## Features
+
+- Backend health check
+- Question detection
+- Resume upload for `.pdf`, `.txt`, and `.md`
+- Job description paste or file upload for `.pdf`, `.txt`, and `.md`
+- Local saved practice context
+- Cue generation using saved or manual context
+- Answer scoring
+
 ## Run Backend
 
 From the project root:
@@ -51,6 +61,13 @@ http://localhost:5173
 cd frontend
 npm run build
 ```
+
+## Local Context Storage
+
+Uploaded practice files are saved locally under `backend/data/uploads/`.
+Extracted resume and job description context is saved under `backend/data/processed/context.json`.
+
+These files are ignored by Git so private resumes and job descriptions are not committed.
 
 ## Run With Docker
 

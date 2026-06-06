@@ -16,6 +16,26 @@ type QuestionDetectionResponse = {
   topic: string | null
 }
 
+type UploadedDocumentResponse = {
+  status: string
+  filename: string | null
+  source: string
+  character_count: number
+  preview: string
+}
+
+type PracticeContextResponse = {
+  has_resume: boolean
+  has_job_description: boolean
+  resume_filename: string | null
+  job_description_filename: string | null
+  resume_char_count: number
+  job_description_char_count: number
+  updated_at: string | null
+  resume_preview: string
+  job_description_preview: string
+}
+
 type CueGenerationResponse = {
   question: string
   cue_points: string[]
@@ -30,20 +50,19 @@ type AnswerScoringResponse = {
 }
 
 async function apiRequest<T>(path: string, options?: RequestInit): Promise<T> {
+  const headers = new Headers(options?.headers)
+
+  if (!(options?.body instanceof FormData) && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
+
+  let response: Response
+
   try {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers,
-      },
+    response = await fetch(`${API_BASE_URL}${path}`, {
       ...options,
+      headers,
     })
-
-    if (!response.ok) {
-      throw new Error(`Backend returned ${response.status} ${response.statusText}`)
-    }
-
-    return (await response.json()) as T
   } catch (error) {
     if (error instanceof Error) {
       throw new Error(
@@ -54,6 +73,22 @@ async function apiRequest<T>(path: string, options?: RequestInit): Promise<T> {
 
     throw new Error(`Could not reach the backend at ${API_BASE_URL}.`, { cause: error })
   }
+
+  if (!response.ok) {
+    const detail = await readErrorDetail(response)
+    throw new Error(detail || `Backend returned ${response.status} ${response.statusText}`)
+  }
+
+  return (await response.json()) as T
+}
+
+async function readErrorDetail(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as { detail?: string }
+    return body.detail ?? ''
+  } catch {
+    return ''
+  }
 }
 
 function App() {
@@ -61,12 +96,30 @@ function App() {
   const [healthError, setHealthError] = useState('')
   const [healthLoading, setHealthLoading] = useState(false)
 
+  const [resumeFile, setResumeFile] = useState<File | null>(null)
+  const [resumeUpload, setResumeUpload] = useState<UploadedDocumentResponse | null>(null)
+  const [resumeError, setResumeError] = useState('')
+  const [resumeLoading, setResumeLoading] = useState(false)
+
+  const [jdText, setJdText] = useState(
+    'Senior data engineer role focused on Spark, Databricks, production pipelines, data quality, and Azure.',
+  )
+  const [jdFile, setJdFile] = useState<File | null>(null)
+  const [jdUpload, setJdUpload] = useState<UploadedDocumentResponse | null>(null)
+  const [jdError, setJdError] = useState('')
+  const [jdLoading, setJdLoading] = useState(false)
+
+  const [context, setContext] = useState<PracticeContextResponse | null>(null)
+  const [contextError, setContextError] = useState('')
+  const [contextLoading, setContextLoading] = useState(false)
+
   const [transcript, setTranscript] = useState('How did you optimize Spark jobs?')
   const [detectedQuestion, setDetectedQuestion] = useState<QuestionDetectionResponse | null>(null)
   const [detectError, setDetectError] = useState('')
   const [detectLoading, setDetectLoading] = useState(false)
 
   const [cueQuestion, setCueQuestion] = useState('How did you optimize Spark jobs?')
+  const [useSavedContext, setUseSavedContext] = useState(true)
   const [cueResumeContext, setCueResumeContext] = useState('')
   const [cueJobDescription, setCueJobDescription] = useState('')
   const [cues, setCues] = useState<CueGenerationResponse | null>(null)
@@ -96,6 +149,108 @@ function App() {
     }
   }
 
+  async function uploadResume() {
+    setResumeLoading(true)
+    setResumeError('')
+
+    try {
+      if (!resumeFile) {
+        throw new Error('Choose a resume file first.')
+      }
+
+      const formData = new FormData()
+      formData.append('file', resumeFile)
+      const result = await apiRequest<UploadedDocumentResponse>('/upload/resume', {
+        method: 'POST',
+        body: formData,
+      })
+
+      setResumeUpload(result)
+      await refreshContext()
+    } catch (error) {
+      setResumeUpload(null)
+      setResumeError(error instanceof Error ? error.message : 'Resume upload failed.')
+    } finally {
+      setResumeLoading(false)
+    }
+  }
+
+  async function saveJobDescriptionText() {
+    setJdLoading(true)
+    setJdError('')
+
+    try {
+      const result = await apiRequest<UploadedDocumentResponse>('/upload/job-description-text', {
+        method: 'POST',
+        body: JSON.stringify({ text: jdText, source: 'pasted_job_description' }),
+      })
+
+      setJdUpload(result)
+      await refreshContext()
+    } catch (error) {
+      setJdUpload(null)
+      setJdError(error instanceof Error ? error.message : 'Job description save failed.')
+    } finally {
+      setJdLoading(false)
+    }
+  }
+
+  async function uploadJobDescriptionFile() {
+    setJdLoading(true)
+    setJdError('')
+
+    try {
+      if (!jdFile) {
+        throw new Error('Choose a job description file first.')
+      }
+
+      const formData = new FormData()
+      formData.append('file', jdFile)
+      const result = await apiRequest<UploadedDocumentResponse>('/upload/job-description-file', {
+        method: 'POST',
+        body: formData,
+      })
+
+      setJdUpload(result)
+      await refreshContext()
+    } catch (error) {
+      setJdUpload(null)
+      setJdError(error instanceof Error ? error.message : 'Job description file upload failed.')
+    } finally {
+      setJdLoading(false)
+    }
+  }
+
+  async function refreshContext() {
+    setContextLoading(true)
+    setContextError('')
+
+    try {
+      setContext(await apiRequest<PracticeContextResponse>('/context'))
+    } catch (error) {
+      setContext(null)
+      setContextError(error instanceof Error ? error.message : 'Context refresh failed.')
+    } finally {
+      setContextLoading(false)
+    }
+  }
+
+  async function clearSavedContext() {
+    setContextLoading(true)
+    setContextError('')
+
+    try {
+      await apiRequest<{ status: string }>('/context', { method: 'DELETE' })
+      setContext(await apiRequest<PracticeContextResponse>('/context'))
+      setResumeUpload(null)
+      setJdUpload(null)
+    } catch (error) {
+      setContextError(error instanceof Error ? error.message : 'Context clear failed.')
+    } finally {
+      setContextLoading(false)
+    }
+  }
+
   async function detectQuestion() {
     setDetectLoading(true)
     setDetectError('')
@@ -119,15 +274,19 @@ function App() {
     setCueLoading(true)
     setCueError('')
 
+    const body = useSavedContext
+      ? { question: cueQuestion }
+      : {
+          question: cueQuestion,
+          resume_context: cueResumeContext,
+          job_description: cueJobDescription,
+        }
+
     try {
       setCues(
         await apiRequest<CueGenerationResponse>('/generate-cues', {
           method: 'POST',
-          body: JSON.stringify({
-            question: cueQuestion,
-            resume_context: cueResumeContext,
-            job_description: cueJobDescription,
-          }),
+          body: JSON.stringify(body),
         }),
       )
     } catch (error) {
@@ -207,6 +366,109 @@ function App() {
       <section className="panel">
         <div className="section-heading">
           <div>
+            <h2>Resume &amp; JD Context</h2>
+            <p>Upload practice documents or paste a job description for saved cue context.</p>
+          </div>
+          <div className="button-row">
+            <button type="button" onClick={refreshContext} disabled={contextLoading}>
+              {contextLoading ? 'Refreshing...' : 'Refresh Context'}
+            </button>
+            <button className="danger-button" type="button" onClick={clearSavedContext} disabled={contextLoading}>
+              Clear Context
+            </button>
+          </div>
+        </div>
+
+        <div className="context-layout">
+          <div className="upload-block">
+            <h3>Resume File</h3>
+            <label>
+              Upload resume file
+              <input
+                accept=".pdf,.txt,.md"
+                type="file"
+                onChange={(event) => setResumeFile(event.target.files?.[0] ?? null)}
+              />
+            </label>
+            <button type="button" onClick={uploadResume} disabled={resumeLoading}>
+              {resumeLoading ? 'Uploading...' : 'Upload Resume'}
+            </button>
+            {resumeError && <p className="error-message">{resumeError}</p>}
+            {resumeUpload && <UploadResult result={resumeUpload} />}
+          </div>
+
+          <div className="upload-block">
+            <h3>Job Description</h3>
+            <label>
+              Paste JD text
+              <textarea value={jdText} onChange={(event) => setJdText(event.target.value)} rows={5} />
+            </label>
+            <button type="button" onClick={saveJobDescriptionText} disabled={jdLoading}>
+              {jdLoading ? 'Saving...' : 'Save JD Text'}
+            </button>
+
+            <label>
+              Upload JD file optional
+              <input
+                accept=".pdf,.txt,.md"
+                type="file"
+                onChange={(event) => setJdFile(event.target.files?.[0] ?? null)}
+              />
+            </label>
+            <button type="button" onClick={uploadJobDescriptionFile} disabled={jdLoading}>
+              {jdLoading ? 'Uploading...' : 'Upload JD File'}
+            </button>
+            {jdError && <p className="error-message">{jdError}</p>}
+            {jdUpload && <UploadResult result={jdUpload} />}
+          </div>
+        </div>
+
+        {contextError && <p className="error-message">{contextError}</p>}
+
+        {context && (
+          <div className="context-panel">
+            <h3>Current Context</h3>
+            <dl className="result-grid">
+              <div>
+                <dt>Resume loaded</dt>
+                <dd>{context.has_resume ? 'Yes' : 'No'}</dd>
+              </div>
+              <div>
+                <dt>JD loaded</dt>
+                <dd>{context.has_job_description ? 'Yes' : 'No'}</dd>
+              </div>
+              <div>
+                <dt>Resume source</dt>
+                <dd>{context.resume_filename ?? 'None'}</dd>
+              </div>
+              <div>
+                <dt>JD source</dt>
+                <dd>{context.job_description_filename ?? 'None'}</dd>
+              </div>
+              <div>
+                <dt>Resume chars</dt>
+                <dd>{context.resume_char_count}</dd>
+              </div>
+              <div>
+                <dt>JD chars</dt>
+                <dd>{context.job_description_char_count}</dd>
+              </div>
+              <div>
+                <dt>Updated</dt>
+                <dd>{context.updated_at ?? 'Never'}</dd>
+              </div>
+            </dl>
+            <div className="preview-grid">
+              <PreviewCard title="Resume preview" preview={context.resume_preview} />
+              <PreviewCard title="JD preview" preview={context.job_description_preview} />
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section className="panel">
+        <div className="section-heading">
+          <div>
             <h2>Question Detection</h2>
             <p>Paste an interviewer transcript and classify whether it contains a question.</p>
           </div>
@@ -255,28 +517,40 @@ function App() {
           </button>
         </div>
 
-        <div className="form-grid">
-          <label>
-            Question
-            <textarea value={cueQuestion} onChange={(event) => setCueQuestion(event.target.value)} rows={3} />
-          </label>
-          <label>
-            Resume context optional
-            <textarea
-              value={cueResumeContext}
-              onChange={(event) => setCueResumeContext(event.target.value)}
-              rows={3}
-            />
-          </label>
-          <label>
-            Job description optional
-            <textarea
-              value={cueJobDescription}
-              onChange={(event) => setCueJobDescription(event.target.value)}
-              rows={3}
-            />
-          </label>
-        </div>
+        <label>
+          Question
+          <textarea value={cueQuestion} onChange={(event) => setCueQuestion(event.target.value)} rows={3} />
+        </label>
+
+        <label className="checkbox-row">
+          <input
+            checked={useSavedContext}
+            type="checkbox"
+            onChange={(event) => setUseSavedContext(event.target.checked)}
+          />
+          Use saved resume/JD context
+        </label>
+
+        {!useSavedContext && (
+          <div className="form-grid">
+            <label>
+              Resume context optional
+              <textarea
+                value={cueResumeContext}
+                onChange={(event) => setCueResumeContext(event.target.value)}
+                rows={3}
+              />
+            </label>
+            <label>
+              Job description optional
+              <textarea
+                value={cueJobDescription}
+                onChange={(event) => setCueJobDescription(event.target.value)}
+                rows={3}
+              />
+            </label>
+          </div>
+        )}
 
         {cueError && <p className="error-message">{cueError}</p>}
 
@@ -344,6 +618,26 @@ function App() {
         )}
       </section>
     </main>
+  )
+}
+
+function UploadResult({ result }: { result: UploadedDocumentResponse }) {
+  return (
+    <div className="upload-result">
+      <p>
+        <strong>{result.filename ?? result.source}</strong> saved with {result.character_count} characters.
+      </p>
+      <p>{result.preview}</p>
+    </div>
+  )
+}
+
+function PreviewCard({ title, preview }: { title: string; preview: string }) {
+  return (
+    <div className="preview-card">
+      <h3>{title}</h3>
+      <p>{preview || 'No saved text yet.'}</p>
+    </div>
   )
 }
 

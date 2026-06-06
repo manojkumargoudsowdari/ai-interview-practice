@@ -1,0 +1,5 @@
+Sample Job Description
+
+Role: Senior Data Engineer
+Responsibilities: Build Databricks pipelines, optimize Spark workloads, improve data quality, and support production SLAs.
+Preferred Skills: Python, SQL, Delta Lake, Azure, orchestration, and stakeholder communication.
