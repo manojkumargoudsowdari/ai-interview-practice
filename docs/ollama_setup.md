@@ -30,16 +30,16 @@ ollama serve
 
 ## Pull A Model
 
-Recommended model:
-
-```powershell
-ollama pull llama3.1:8b
-```
-
-Alternative lighter model for weaker machines:
+Recommended starter model:
 
 ```powershell
 ollama pull llama3.2:3b
+```
+
+Optional larger model if your machine has enough resources:
+
+```powershell
+ollama pull llama3.1:8b
 ```
 
 List local models:
@@ -51,15 +51,15 @@ ollama list
 ## Test Basic Generation
 
 ```powershell
-ollama run llama3.1:8b 'Return only JSON: {"status":"ok"}'
+ollama run llama3.2:3b 'Return only JSON: {"status":"ok"}'
 ```
 
 ## Configure Backend
 
-Copy the Ollama example env file:
+Use the provider switch helper:
 
 ```powershell
-Copy-Item backend\.env.ollama.example backend\.env -Force
+.\scripts\set_llm_provider.ps1 -Provider ollama -Model llama3.2:3b
 ```
 
 Or set these values in `backend/.env`:
@@ -67,7 +67,7 @@ Or set these values in `backend/.env`:
 ```env
 LLM_PROVIDER=ollama
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=llama3.1:8b
+OLLAMA_MODEL=llama3.2:3b
 LLM_TIMEOUT_SECONDS=60
 ```
 

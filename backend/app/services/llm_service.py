@@ -12,6 +12,9 @@ from app.services.cue_generator import generate_rule_based_cues
 SYSTEM_PROMPT = """You are an AI interview practice coach.
 Generate short cue points only.
 Do not generate a full answer paragraph.
+cue_points must be concise answer fragments or keywords, not interviewer questions.
+Put actual questions only in follow_up_questions.
+short_direction must be an imperative coaching sentence, not a question.
 Use the candidate's resume/JD context when available.
 Do not invent experience.
 If direct experience is missing, phrase cues as "related experience" or "conceptual approach."
@@ -19,7 +22,9 @@ Return strict JSON only.
 Max 8 cue_points.
 Max 3 risk_flags.
 Max 3 follow_up_questions.
-short_direction should be one sentence."""
+short_direction should be one sentence.
+Good cue_points examples: "Spark UI diagnosis", "shuffle reduction", "partitioning strategy", "measured runtime impact".
+Bad cue_points examples: "What did you change?", "How did you measure performance?"."""
 
 
 def generate_interview_cues(
@@ -111,6 +116,7 @@ def _generate_ollama_cues(
             {"role": "user", "content": _build_user_prompt(question, resume_context, job_description)},
         ],
         "stream": False,
+        "options": {"temperature": 0.1},
     }
 
     try:
@@ -130,7 +136,7 @@ def _generate_ollama_cues(
 
     try:
         parsed = _parse_json_content(content)
-        return _cue_response_from_llm_json(question, parsed)
+        return _cue_response_from_llm_json(question, parsed, resume_context, job_description)
     except (json.JSONDecodeError, ValueError, TypeError) as exc:
         print(f"Ollama response parsing failed. Using fallback cues. Error: {exc}")
         return generate_rule_based_cues(
@@ -196,7 +202,12 @@ def _parse_json_content(content: str) -> dict[str, Any]:
     return parsed
 
 
-def _cue_response_from_llm_json(question: str, parsed: dict[str, Any]) -> CueGenerationResponse:
+def _cue_response_from_llm_json(
+    question: str,
+    parsed: dict[str, Any],
+    resume_context: str | None,
+    job_description: str | None,
+) -> CueGenerationResponse:
     cue_points = _string_list(parsed.get("cue_points"))[:8]
     short_direction = str(parsed.get("short_direction") or "").strip()
     risk_flags = _string_list(parsed.get("risk_flags"))[:3]
@@ -204,6 +215,17 @@ def _cue_response_from_llm_json(question: str, parsed: dict[str, Any]) -> CueGen
 
     if not cue_points or not short_direction:
         raise ValueError("LLM response must include cue_points and short_direction.")
+
+    question_like_cues = [cue for cue in cue_points if _is_question_like(cue)]
+    if question_like_cues:
+        return generate_rule_based_cues(
+            question=question,
+            resume_context=resume_context,
+            job_description=job_description,
+            provider="ollama",
+            risk_flags=(risk_flags + ["LLM returned question-form cue points; normalized to fallback cues."])[:3],
+            follow_up_questions=(follow_up_questions + question_like_cues)[:3],
+        )
 
     return CueGenerationResponse(
         question=question,
@@ -220,6 +242,27 @@ def _string_list(value: Any) -> list[str]:
         return []
 
     return [str(item).strip() for item in value if str(item).strip()]
+
+
+def _is_question_like(value: str) -> bool:
+    lowered = value.strip().lower()
+    question_starters = (
+        "what ",
+        "why ",
+        "how ",
+        "when ",
+        "where ",
+        "which ",
+        "can ",
+        "can you ",
+        "could ",
+        "could you ",
+        "would ",
+        "would you ",
+        "do ",
+        "did ",
+    )
+    return "?" in lowered or lowered.startswith(question_starters)
 
 
 def _clean_base_url(value: str) -> str:
