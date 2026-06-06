@@ -9,6 +9,15 @@ type BackendHealth = {
   status: string
 }
 
+type LLMHealthResponse = {
+  provider: string
+  configured: boolean
+  available: boolean
+  message: string
+  ollama_base_url?: string | null
+  ollama_model?: string | null
+}
+
 type QuestionDetectionResponse = {
   is_question: boolean
   question: string | null
@@ -40,6 +49,9 @@ type CueGenerationResponse = {
   question: string
   cue_points: string[]
   short_direction: string
+  risk_flags: string[]
+  follow_up_questions: string[]
+  provider: string
 }
 
 type AnswerScoringResponse = {
@@ -96,6 +108,10 @@ function App() {
   const [healthError, setHealthError] = useState('')
   const [healthLoading, setHealthLoading] = useState(false)
 
+  const [llmHealth, setLlmHealth] = useState<LLMHealthResponse | null>(null)
+  const [llmHealthError, setLlmHealthError] = useState('')
+  const [llmHealthLoading, setLlmHealthLoading] = useState(false)
+
   const [resumeFile, setResumeFile] = useState<File | null>(null)
   const [resumeUpload, setResumeUpload] = useState<UploadedDocumentResponse | null>(null)
   const [resumeError, setResumeError] = useState('')
@@ -146,6 +162,20 @@ function App() {
       setHealthError(error instanceof Error ? error.message : 'Backend health check failed.')
     } finally {
       setHealthLoading(false)
+    }
+  }
+
+  async function checkLLMProvider() {
+    setLlmHealthLoading(true)
+    setLlmHealthError('')
+
+    try {
+      setLlmHealth(await apiRequest<LLMHealthResponse>('/llm/health'))
+    } catch (error) {
+      setLlmHealth(null)
+      setLlmHealthError(error instanceof Error ? error.message : 'LLM provider health check failed.')
+    } finally {
+      setLlmHealthLoading(false)
     }
   }
 
@@ -366,6 +396,49 @@ function App() {
       <section className="panel">
         <div className="section-heading">
           <div>
+            <h2>LLM Provider</h2>
+            <p>Check whether cue generation is using mock mode or a local Ollama model.</p>
+          </div>
+          <button type="button" onClick={checkLLMProvider} disabled={llmHealthLoading}>
+            {llmHealthLoading ? 'Checking...' : 'Check LLM Provider'}
+          </button>
+        </div>
+
+        {llmHealthError && <p className="error-message">{llmHealthError}</p>}
+
+        {llmHealth && (
+          <dl className="result-grid">
+            <div>
+              <dt>Provider</dt>
+              <dd>{llmHealth.provider}</dd>
+            </div>
+            <div>
+              <dt>Configured</dt>
+              <dd>{String(llmHealth.configured)}</dd>
+            </div>
+            <div>
+              <dt>Available</dt>
+              <dd>
+                <span className={llmHealth.available ? 'status-pill is-ok' : 'status-pill is-warning'}>
+                  {String(llmHealth.available)}
+                </span>
+              </dd>
+            </div>
+            <div>
+              <dt>Model</dt>
+              <dd>{llmHealth.ollama_model ?? 'Not applicable'}</dd>
+            </div>
+            <div>
+              <dt>Message</dt>
+              <dd>{llmHealth.message}</dd>
+            </div>
+          </dl>
+        )}
+      </section>
+
+      <section className="panel">
+        <div className="section-heading">
+          <div>
             <h2>Resume &amp; JD Context</h2>
             <p>Upload practice documents or paste a job description for saved cue context.</p>
           </div>
@@ -556,6 +629,12 @@ function App() {
 
         {cues && (
           <div className="result-block">
+            <dl className="compact-meta">
+              <div>
+                <dt>Provider</dt>
+                <dd>{cues.provider}</dd>
+              </div>
+            </dl>
             <div className="chip-row">
               {cues.cue_points.map((cuePoint) => (
                 <span className="chip" key={cuePoint}>
@@ -564,6 +643,8 @@ function App() {
               ))}
             </div>
             <p className="direction">{cues.short_direction}</p>
+            <CueList title="Risk flags" items={cues.risk_flags} tone="risk" />
+            <CueList title="Follow-up questions" items={cues.follow_up_questions} />
           </div>
         )}
       </section>
@@ -618,6 +699,23 @@ function App() {
         )}
       </section>
     </main>
+  )
+}
+
+function CueList({ title, items, tone = 'default' }: { title: string; items: string[]; tone?: 'default' | 'risk' }) {
+  if (!items.length) {
+    return null
+  }
+
+  return (
+    <div className={`cue-list ${tone === 'risk' ? 'cue-list-risk' : ''}`}>
+      <h3>{title}</h3>
+      <ul>
+        {items.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+    </div>
   )
 }
 

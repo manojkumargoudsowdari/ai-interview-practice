@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class TranscriptRequest(BaseModel):
@@ -26,6 +26,18 @@ class CueGenerationResponse(BaseModel):
     question: str
     cue_points: List[str]
     short_direction: str
+    risk_flags: List[str] = Field(default_factory=list)
+    follow_up_questions: List[str] = Field(default_factory=list)
+    provider: str = "mock"
+
+
+class LLMHealthResponse(BaseModel):
+    provider: str
+    configured: bool
+    available: bool
+    message: str
+    ollama_base_url: Optional[str] = None
+    ollama_model: Optional[str] = None
 
 
 class UploadedDocumentResponse(BaseModel):
