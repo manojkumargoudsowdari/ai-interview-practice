@@ -398,6 +398,7 @@ function App() {
           <div>
             <h2>LLM Provider</h2>
             <p>Check whether cue generation is using mock mode or a local Ollama model.</p>
+            <p className="helper-text">Use backend/.env to switch between mock and ollama providers.</p>
           </div>
           <button type="button" onClick={checkLLMProvider} disabled={llmHealthLoading}>
             {llmHealthLoading ? 'Checking...' : 'Check LLM Provider'}

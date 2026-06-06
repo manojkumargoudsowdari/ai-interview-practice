@@ -29,6 +29,8 @@ pnpm-debug.log*
 backend/.env
 frontend/.env
 !.env.example
+!backend/.env.example
+!backend/.env.ollama.example
 
 # VS Code
 .vscode/*
