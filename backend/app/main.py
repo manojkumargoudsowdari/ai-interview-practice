@@ -26,6 +26,7 @@ from app.services.document_processor import (
     process_text_payload,
     process_uploaded_file,
 )
+from app.services.cue_generator import generate_rule_based_cues
 from app.services.llm_service import generate_interview_cues, get_llm_health
 from app.services.question_detector import detect_question
 from app.services.scoring import score_answer
@@ -62,11 +63,31 @@ def generate_cues_api(request: CueGenerationRequest):
     resume_context = request.resume_context or context.get("resume_text") or None
     job_description = request.job_description or context.get("job_description_text") or None
 
-    return generate_interview_cues(
+    response = generate_interview_cues(
         question=request.question,
         resume_context=resume_context,
         job_description=job_description,
     )
+    if any(_is_question_like_cue(cue) for cue in response.cue_points):
+        return generate_rule_based_cues(
+            question=request.question,
+            resume_context=resume_context,
+            job_description=job_description,
+            provider=response.provider,
+            risk_flags=(
+                response.risk_flags
+                + ["Generated question-form cue points were normalized to short fallback cues."]
+            )[:3],
+            follow_up_questions=(response.follow_up_questions + response.cue_points)[:3],
+        )
+
+    return response
+
+
+def _is_question_like_cue(value: str) -> bool:
+    lowered = value.strip().lower()
+    question_starters = ("what ", "why ", "how ", "when ", "where ", "which ", "can ", "could ", "would ", "do ", "did ")
+    return "?" in lowered or lowered.startswith(question_starters)
 
 
 @app.get("/llm/health", response_model=LLMHealthResponse)

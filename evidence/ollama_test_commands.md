@@ -14,6 +14,20 @@ Run these from PowerShell in the project root unless noted otherwise.
 Copy-Item backend\.env.ollama.example backend\.env -Force
 ```
 
+## Switch Provider With Helper Script
+
+Set backend to Ollama:
+
+```powershell
+.\scripts\set_llm_provider.ps1 -Provider ollama -Model llama3.2:3b
+```
+
+Set backend back to mock:
+
+```powershell
+.\scripts\set_llm_provider.ps1 -Provider mock
+```
+
 ## Start Backend
 
 ```powershell
@@ -44,7 +58,7 @@ Edit `backend/.env`:
 APP_ENV=local
 LLM_PROVIDER=mock
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=llama3.1:8b
+OLLAMA_MODEL=llama3.2:3b
 LLM_TIMEOUT_SECONDS=60
 ```
 

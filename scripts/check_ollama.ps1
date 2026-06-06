@@ -35,10 +35,16 @@ if ($models.Count -eq 0) {
     $models | ForEach-Object { Write-Host "- $_" }
 }
 
-$requiredModel = "llama3.1:8b"
-if ($models -notcontains $requiredModel) {
-    Write-Host "Recommended model is missing. Pull it with:"
-    Write-Host "ollama pull $requiredModel"
+$preferredModel = "llama3.2:3b"
+$largerModel = "llama3.1:8b"
+
+if ($models -contains $preferredModel) {
+    Write-Host "$preferredModel is available and ready for local validation."
+} elseif ($models -contains $largerModel) {
+    Write-Host "$largerModel is available and ready for local validation."
+} else {
+    Write-Host "No recommended local validation model was found. Pull the lightweight default with:"
+    Write-Host "ollama pull $preferredModel"
 }
 
 Write-Host "Ollama validation completed."
