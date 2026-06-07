@@ -136,7 +136,8 @@ label {
 }
 
 textarea,
-input {
+input,
+select {
   width: 100%;
   border: 1px solid #becbd7;
   border-radius: 6px;
@@ -153,7 +154,8 @@ input[type="file"] {
 }
 
 textarea:focus,
-input:focus {
+input:focus,
+select:focus {
   border-color: #3f6f8f;
   box-shadow: 0 0 0 3px rgba(63, 111, 143, 0.16);
   outline: none;
@@ -275,6 +277,70 @@ dd {
 
 .cue-list-risk {
   color: #7c4a03;
+}
+
+.question-bank-controls {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(160px, 220px) minmax(160px, 220px) 1fr;
+  margin-bottom: 16px;
+}
+
+.question-bank-groups {
+  display: grid;
+  gap: 18px;
+  margin-top: 16px;
+}
+
+.question-category {
+  border-top: 1px solid #dfe6ed;
+  padding-top: 16px;
+}
+
+.question-category h3 {
+  color: #17202a;
+  margin-bottom: 12px;
+}
+
+.question-card-list {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.question-card {
+  background: #ffffff;
+  border: 1px solid #dfe6ed;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.question-card h4 {
+  color: #17202a;
+  font-size: 1rem;
+  margin: 10px 0;
+}
+
+.question-card p {
+  color: #4d5a66;
+  margin-bottom: 8px;
+}
+
+.question-card ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+
+.difficulty-pill {
+  background: #eef5f8;
+  border: 1px solid #c7dde8;
+  border-radius: 999px;
+  color: #255d78;
+  display: inline-flex;
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 3px 9px;
+  text-transform: uppercase;
 }
 
 .context-layout {
@@ -409,7 +475,9 @@ dd {
   .score-layout,
   .feedback-columns,
   .context-layout,
-  .preview-grid {
+  .preview-grid,
+  .question-bank-controls,
+  .question-card-list {
     grid-template-columns: 1fr;
   }
 

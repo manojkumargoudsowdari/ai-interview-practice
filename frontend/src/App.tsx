@@ -45,6 +45,31 @@ type PracticeContextResponse = {
   job_description_preview: string
 }
 
+type QuestionBankItem = {
+  id: string
+  category: string
+  difficulty: string
+  question: string
+  interviewer_intent: string
+  expected_answer_angle: string
+  follow_up_questions: string[]
+}
+
+type QuestionBankGenerateResponse = {
+  provider: string
+  total_questions: number
+  categories: string[]
+  questions: QuestionBankItem[]
+  warnings: string[]
+}
+
+type QuestionBankStoreResponse = {
+  has_question_bank: boolean
+  total_questions: number
+  updated_at: string | null
+  preview: QuestionBankItem[]
+}
+
 type CueGenerationResponse = {
   question: string
   cue_points: string[]
@@ -128,6 +153,14 @@ function App() {
   const [context, setContext] = useState<PracticeContextResponse | null>(null)
   const [contextError, setContextError] = useState('')
   const [contextLoading, setContextLoading] = useState(false)
+
+  const [questionBankTotal, setQuestionBankTotal] = useState(55)
+  const [questionBankDifficulty, setQuestionBankDifficulty] = useState('mixed')
+  const [questionBankUseSavedContext, setQuestionBankUseSavedContext] = useState(true)
+  const [questionBank, setQuestionBank] = useState<QuestionBankGenerateResponse | null>(null)
+  const [questionBankStore, setQuestionBankStore] = useState<QuestionBankStoreResponse | null>(null)
+  const [questionBankError, setQuestionBankError] = useState('')
+  const [questionBankLoading, setQuestionBankLoading] = useState(false)
 
   const [transcript, setTranscript] = useState('How did you optimize Spark jobs?')
   const [detectedQuestion, setDetectedQuestion] = useState<QuestionDetectionResponse | null>(null)
@@ -281,6 +314,62 @@ function App() {
     }
   }
 
+  async function generateQuestionBank() {
+    setQuestionBankLoading(true)
+    setQuestionBankError('')
+
+    try {
+      const result = await apiRequest<QuestionBankGenerateResponse>('/question-bank/generate', {
+        method: 'POST',
+        body: JSON.stringify({
+          total_questions: questionBankTotal,
+          difficulty: questionBankDifficulty,
+          use_saved_context: questionBankUseSavedContext,
+        }),
+      })
+      setQuestionBank(result)
+      setQuestionBankStore(null)
+    } catch (error) {
+      setQuestionBank(null)
+      setQuestionBankError(error instanceof Error ? error.message : 'Question bank generation failed.')
+    } finally {
+      setQuestionBankLoading(false)
+    }
+  }
+
+  async function loadSavedQuestionBank() {
+    setQuestionBankLoading(true)
+    setQuestionBankError('')
+
+    try {
+      const result = await apiRequest<QuestionBankStoreResponse>('/question-bank')
+      setQuestionBankStore(result)
+      if (!result.has_question_bank) {
+        setQuestionBank(null)
+      }
+    } catch (error) {
+      setQuestionBankStore(null)
+      setQuestionBankError(error instanceof Error ? error.message : 'Question bank load failed.')
+    } finally {
+      setQuestionBankLoading(false)
+    }
+  }
+
+  async function clearSavedQuestionBank() {
+    setQuestionBankLoading(true)
+    setQuestionBankError('')
+
+    try {
+      await apiRequest<{ status: string }>('/question-bank', { method: 'DELETE' })
+      setQuestionBank(null)
+      setQuestionBankStore(await apiRequest<QuestionBankStoreResponse>('/question-bank'))
+    } catch (error) {
+      setQuestionBankError(error instanceof Error ? error.message : 'Question bank clear failed.')
+    } finally {
+      setQuestionBankLoading(false)
+    }
+  }
+
   async function detectQuestion() {
     setDetectLoading(true)
     setDetectError('')
@@ -390,6 +479,103 @@ function App() {
               <dd>{health.status}</dd>
             </div>
           </dl>
+        )}
+      </section>
+
+      <section className="panel">
+        <div className="section-heading">
+          <div>
+            <h2>Question Bank</h2>
+            <p>Generate categorized practice questions from saved resume and job description context.</p>
+          </div>
+          <div className="button-row">
+            <button type="button" onClick={generateQuestionBank} disabled={questionBankLoading}>
+              {questionBankLoading ? 'Generating...' : 'Generate Question Bank'}
+            </button>
+            <button type="button" onClick={loadSavedQuestionBank} disabled={questionBankLoading}>
+              Load Saved Question Bank
+            </button>
+            <button className="danger-button" type="button" onClick={clearSavedQuestionBank} disabled={questionBankLoading}>
+              Clear Question Bank
+            </button>
+          </div>
+        </div>
+
+        <div className="question-bank-controls">
+          <label>
+            Total questions
+            <input
+              min={11}
+              max={110}
+              type="number"
+              value={questionBankTotal}
+              onChange={(event) => setQuestionBankTotal(Number(event.target.value))}
+            />
+          </label>
+          <label>
+            Difficulty
+            <select value={questionBankDifficulty} onChange={(event) => setQuestionBankDifficulty(event.target.value)}>
+              <option value="mixed">mixed</option>
+              <option value="easy">easy</option>
+              <option value="medium">medium</option>
+              <option value="hard">hard</option>
+            </select>
+          </label>
+          <label className="checkbox-row">
+            <input
+              checked={questionBankUseSavedContext}
+              type="checkbox"
+              onChange={(event) => setQuestionBankUseSavedContext(event.target.checked)}
+            />
+            Use saved resume/JD context
+          </label>
+        </div>
+
+        {questionBankError && <p className="error-message">{questionBankError}</p>}
+
+        {questionBankStore && (
+          <div className="result-block">
+            <dl className="compact-meta">
+              <div>
+                <dt>Saved</dt>
+                <dd>{questionBankStore.has_question_bank ? 'Yes' : 'No'}</dd>
+              </div>
+              <div>
+                <dt>Total</dt>
+                <dd>{questionBankStore.total_questions}</dd>
+              </div>
+              <div>
+                <dt>Updated</dt>
+                <dd>{questionBankStore.updated_at ?? 'Never'}</dd>
+              </div>
+            </dl>
+            {questionBankStore.preview.length > 0 && (
+              <QuestionBankGroups questions={questionBankStore.preview} />
+            )}
+          </div>
+        )}
+
+        {questionBank && (
+          <div className="result-block">
+            <dl className="compact-meta">
+              <div>
+                <dt>Provider</dt>
+                <dd>{questionBank.provider}</dd>
+              </div>
+              <div>
+                <dt>Total</dt>
+                <dd>{questionBank.total_questions}</dd>
+              </div>
+              <div>
+                <dt>Categories</dt>
+                <dd>{questionBank.categories.length}</dd>
+              </div>
+            </dl>
+            {questionBank.warnings.length > 0 && (
+              <CueList title="Warnings" items={questionBank.warnings} tone="risk" />
+            )}
+            <QuestionBankGroups questions={questionBank.questions} />
+          </div>
         )}
       </section>
 
@@ -716,6 +902,48 @@ function CueList({ title, items, tone = 'default' }: { title: string; items: str
           <li key={item}>{item}</li>
         ))}
       </ul>
+    </div>
+  )
+}
+
+function QuestionBankGroups({ questions }: { questions: QuestionBankItem[] }) {
+  const groupedQuestions = questions.reduce<Record<string, QuestionBankItem[]>>((groups, question) => {
+    groups[question.category] = groups[question.category] ?? []
+    groups[question.category].push(question)
+    return groups
+  }, {})
+
+  return (
+    <div className="question-bank-groups">
+      {Object.entries(groupedQuestions).map(([category, items]) => (
+        <section className="question-category" key={category}>
+          <h3>{category}</h3>
+          <div className="question-card-list">
+            {items.map((item) => (
+              <article className="question-card" key={item.id}>
+                <span className="difficulty-pill">{item.difficulty}</span>
+                <h4>{item.question}</h4>
+                <p>
+                  <strong>Interviewer intent:</strong> {item.interviewer_intent}
+                </p>
+                <p>
+                  <strong>Expected answer angle:</strong> {item.expected_answer_angle}
+                </p>
+                {item.follow_up_questions.length > 0 && (
+                  <div>
+                    <strong>Follow-ups</strong>
+                    <ul>
+                      {item.follow_up_questions.map((followUp) => (
+                        <li key={followUp}>{followUp}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </article>
+            ))}
+          </div>
+        </section>
+      ))}
     </div>
   )
 }
