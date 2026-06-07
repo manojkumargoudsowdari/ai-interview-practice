@@ -286,6 +286,22 @@ dd {
   margin-bottom: 16px;
 }
 
+.practice-controls {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(180px, 1.2fr) minmax(150px, 0.8fr) minmax(140px, 0.6fr) 1fr;
+  margin-bottom: 16px;
+}
+
+.practice-session-layout {
+  display: grid;
+  gap: 14px;
+}
+
+.practice-question-card {
+  background: #f7f9fb;
+}
+
 .question-bank-groups {
   display: grid;
   gap: 18px;
@@ -477,6 +493,7 @@ dd {
   .context-layout,
   .preview-grid,
   .question-bank-controls,
+  .practice-controls,
   .question-card-list {
     grid-template-columns: 1fr;
   }

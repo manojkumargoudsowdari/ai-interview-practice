@@ -86,6 +86,73 @@ type AnswerScoringResponse = {
   improved_answer: string
 }
 
+type PracticeSessionQuestion = {
+  id: string
+  category: string
+  difficulty: string
+  question: string
+  interviewer_intent: string
+  expected_answer_angle: string
+  follow_up_questions: string[]
+}
+
+type PracticeSessionStartResponse = {
+  session_id: string
+  total_questions: number
+  current_index: number
+  current_question: PracticeSessionQuestion | null
+  message: string
+}
+
+type PracticeAnswerScore = {
+  score: number
+  strengths: string[]
+  improvements: string[]
+  improved_answer: string
+}
+
+type PracticeAnswerSubmitResponse = {
+  session_id: string
+  question_id: string
+  score: PracticeAnswerScore
+  next_question: PracticeSessionQuestion | null
+  completed: boolean
+  progress: string
+}
+
+type PracticeSessionSummaryResponse = {
+  session_id: string
+  total_questions: number
+  answered_questions: number
+  average_score: number | null
+  weak_categories: string[]
+  strong_categories: string[]
+  history: Array<Record<string, unknown>>
+  completed: boolean
+}
+
+type PracticeSessionStoreResponse = {
+  has_sessions: boolean
+  total_sessions: number
+  latest_session_id: string | null
+  latest_summary: PracticeSessionSummaryResponse | null
+}
+
+const QUESTION_CATEGORIES = [
+  'all',
+  'Resume walkthrough',
+  'Project deep dive',
+  'Spark / PySpark',
+  'Databricks / Delta Lake',
+  'ETL / pipelines',
+  'Production support',
+  'Data modeling',
+  'AI-ready datasets',
+  'RAG / AI agents',
+  'Behavioral',
+  'Pressure follow-ups',
+]
+
 async function apiRequest<T>(path: string, options?: RequestInit): Promise<T> {
   const headers = new Headers(options?.headers)
 
@@ -161,6 +228,20 @@ function App() {
   const [questionBankStore, setQuestionBankStore] = useState<QuestionBankStoreResponse | null>(null)
   const [questionBankError, setQuestionBankError] = useState('')
   const [questionBankLoading, setQuestionBankLoading] = useState(false)
+
+  const [practiceCategory, setPracticeCategory] = useState('all')
+  const [practiceDifficulty, setPracticeDifficulty] = useState('mixed')
+  const [practiceMaxQuestions, setPracticeMaxQuestions] = useState(10)
+  const [practiceShuffle, setPracticeShuffle] = useState(true)
+  const [practiceSessionId, setPracticeSessionId] = useState('')
+  const [practiceCurrentQuestion, setPracticeCurrentQuestion] = useState<PracticeSessionQuestion | null>(null)
+  const [practiceTotalQuestions, setPracticeTotalQuestions] = useState(0)
+  const [practiceAnswer, setPracticeAnswer] = useState('')
+  const [practiceScore, setPracticeScore] = useState<PracticeAnswerSubmitResponse | null>(null)
+  const [practiceSummary, setPracticeSummary] = useState<PracticeSessionSummaryResponse | null>(null)
+  const [practiceStore, setPracticeStore] = useState<PracticeSessionStoreResponse | null>(null)
+  const [practiceError, setPracticeError] = useState('')
+  const [practiceLoading, setPracticeLoading] = useState(false)
 
   const [transcript, setTranscript] = useState('How did you optimize Spark jobs?')
   const [detectedQuestion, setDetectedQuestion] = useState<QuestionDetectionResponse | null>(null)
@@ -370,6 +451,104 @@ function App() {
     }
   }
 
+  async function startPracticeSession() {
+    setPracticeLoading(true)
+    setPracticeError('')
+
+    try {
+      const result = await apiRequest<PracticeSessionStartResponse>('/practice/start', {
+        method: 'POST',
+        body: JSON.stringify({
+          category_filter: practiceCategory,
+          difficulty_filter: practiceDifficulty,
+          max_questions: practiceMaxQuestions,
+          shuffle: practiceShuffle,
+        }),
+      })
+      setPracticeSessionId(result.session_id)
+      setPracticeCurrentQuestion(result.current_question)
+      setPracticeTotalQuestions(result.total_questions)
+      setPracticeAnswer('')
+      setPracticeScore(null)
+      setPracticeSummary(null)
+      setPracticeStore(null)
+    } catch (error) {
+      setPracticeError(error instanceof Error ? error.message : 'Practice session start failed.')
+    } finally {
+      setPracticeLoading(false)
+    }
+  }
+
+  async function submitPracticeAnswer() {
+    setPracticeLoading(true)
+    setPracticeError('')
+
+    try {
+      if (!practiceSessionId || !practiceCurrentQuestion) {
+        throw new Error('Start a practice session first.')
+      }
+
+      const result = await apiRequest<PracticeAnswerSubmitResponse>('/practice/answer', {
+        method: 'POST',
+        body: JSON.stringify({
+          session_id: practiceSessionId,
+          question_id: practiceCurrentQuestion.id,
+          answer: practiceAnswer,
+        }),
+      })
+      setPracticeScore(result)
+      setPracticeCurrentQuestion(result.next_question)
+      setPracticeAnswer('')
+
+      if (result.completed) {
+        setPracticeSummary(await apiRequest<PracticeSessionSummaryResponse>(`/practice/session/${practiceSessionId}`))
+      }
+    } catch (error) {
+      setPracticeError(error instanceof Error ? error.message : 'Practice answer submit failed.')
+    } finally {
+      setPracticeLoading(false)
+    }
+  }
+
+  async function loadLatestPracticeSession() {
+    setPracticeLoading(true)
+    setPracticeError('')
+
+    try {
+      const result = await apiRequest<PracticeSessionStoreResponse>('/practice/sessions')
+      setPracticeStore(result)
+      setPracticeSummary(result.latest_summary)
+      setPracticeSessionId(result.latest_session_id ?? '')
+      setPracticeCurrentQuestion(null)
+      setPracticeScore(null)
+    } catch (error) {
+      setPracticeStore(null)
+      setPracticeError(error instanceof Error ? error.message : 'Practice session load failed.')
+    } finally {
+      setPracticeLoading(false)
+    }
+  }
+
+  async function clearPracticeSessions() {
+    setPracticeLoading(true)
+    setPracticeError('')
+
+    try {
+      await apiRequest<{ status: string }>('/practice/sessions', { method: 'DELETE' })
+      setPracticeSessionId('')
+      setPracticeCurrentQuestion(null)
+      setPracticeTotalQuestions(0)
+      setPracticeAnswer('')
+      setPracticeScore(null)
+      setPracticeSummary(null)
+      setPracticeStore(await apiRequest<PracticeSessionStoreResponse>('/practice/sessions'))
+    } catch (error) {
+      setPracticeError(error instanceof Error ? error.message : 'Practice sessions clear failed.')
+    } finally {
+      setPracticeLoading(false)
+    }
+  }
+
   async function detectQuestion() {
     setDetectLoading(true)
     setDetectError('')
@@ -479,6 +658,119 @@ function App() {
               <dd>{health.status}</dd>
             </div>
           </dl>
+        )}
+      </section>
+
+      <section className="panel">
+        <div className="section-heading">
+          <div>
+            <h2>Practice Session</h2>
+            <p>Practice saved question-bank questions one at a time and save scored answer history.</p>
+          </div>
+          <div className="button-row">
+            <button type="button" onClick={startPracticeSession} disabled={practiceLoading}>
+              {practiceLoading ? 'Starting...' : 'Start Practice Session'}
+            </button>
+            <button type="button" onClick={loadLatestPracticeSession} disabled={practiceLoading}>
+              Load Latest Session
+            </button>
+            <button className="danger-button" type="button" onClick={clearPracticeSessions} disabled={practiceLoading}>
+              Clear Practice Sessions
+            </button>
+          </div>
+        </div>
+
+        <div className="practice-controls">
+          <label>
+            Category
+            <select value={practiceCategory} onChange={(event) => setPracticeCategory(event.target.value)}>
+              {QUESTION_CATEGORIES.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Difficulty
+            <select value={practiceDifficulty} onChange={(event) => setPracticeDifficulty(event.target.value)}>
+              <option value="mixed">mixed</option>
+              <option value="easy">easy</option>
+              <option value="medium">medium</option>
+              <option value="hard">hard</option>
+            </select>
+          </label>
+          <label>
+            Max questions
+            <input
+              min={1}
+              max={50}
+              type="number"
+              value={practiceMaxQuestions}
+              onChange={(event) => setPracticeMaxQuestions(Number(event.target.value))}
+            />
+          </label>
+          <label className="checkbox-row">
+            <input checked={practiceShuffle} type="checkbox" onChange={(event) => setPracticeShuffle(event.target.checked)} />
+            Shuffle questions
+          </label>
+        </div>
+
+        {practiceError && <p className="error-message">{practiceError}</p>}
+
+        {practiceStore && (
+          <dl className="result-grid">
+            <div>
+              <dt>Saved sessions</dt>
+              <dd>{practiceStore.has_sessions ? 'Yes' : 'No'}</dd>
+            </div>
+            <div>
+              <dt>Total sessions</dt>
+              <dd>{practiceStore.total_sessions}</dd>
+            </div>
+            <div>
+              <dt>Latest session</dt>
+              <dd>{practiceStore.latest_session_id ?? 'None'}</dd>
+            </div>
+          </dl>
+        )}
+
+        {practiceCurrentQuestion && (
+          <div className="practice-session-layout">
+            <PracticeQuestionCard question={practiceCurrentQuestion} />
+            <label>
+              My answer
+              <textarea value={practiceAnswer} onChange={(event) => setPracticeAnswer(event.target.value)} rows={6} />
+            </label>
+            <button type="button" onClick={submitPracticeAnswer} disabled={practiceLoading}>
+              {practiceLoading ? 'Scoring...' : 'Submit Answer'}
+            </button>
+            <p className="helper-text">
+              Session {practiceSessionId} · {practiceTotalQuestions} questions
+            </p>
+          </div>
+        )}
+
+        {practiceScore && (
+          <div className="score-layout">
+            <div className="score-card">
+              <span className="score-value">{practiceScore.score.score.toFixed(1)}</span>
+              <span className="score-label">Score</span>
+            </div>
+            <div className="feedback-columns">
+              <FeedbackList title="Strengths" items={practiceScore.score.strengths} />
+              <FeedbackList title="Improvements" items={practiceScore.score.improvements} />
+            </div>
+            <div className="guidance">
+              <h3>Improved answer guidance</h3>
+              <p>{practiceScore.score.improved_answer}</p>
+              <p className="helper-text">Progress: {practiceScore.progress}</p>
+            </div>
+          </div>
+        )}
+
+        {practiceSummary && (
+          <PracticeSummary summary={practiceSummary} />
         )}
       </section>
 
@@ -944,6 +1236,62 @@ function QuestionBankGroups({ questions }: { questions: QuestionBankItem[] }) {
           </div>
         </section>
       ))}
+    </div>
+  )
+}
+
+function PracticeQuestionCard({ question }: { question: PracticeSessionQuestion }) {
+  return (
+    <article className="question-card practice-question-card">
+      <span className="difficulty-pill">{question.difficulty}</span>
+      <h4>{question.question}</h4>
+      <p>
+        <strong>Category:</strong> {question.category}
+      </p>
+      <p>
+        <strong>Interviewer intent:</strong> {question.interviewer_intent}
+      </p>
+      <p>
+        <strong>Expected answer angle:</strong> {question.expected_answer_angle}
+      </p>
+      {question.follow_up_questions.length > 0 && (
+        <div>
+          <strong>Follow-ups</strong>
+          <ul>
+            {question.follow_up_questions.map((followUp) => (
+              <li key={followUp}>{followUp}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </article>
+  )
+}
+
+function PracticeSummary({ summary }: { summary: PracticeSessionSummaryResponse }) {
+  return (
+    <div className="result-block">
+      <h3>Session Summary</h3>
+      <dl className="result-grid">
+        <div>
+          <dt>Average score</dt>
+          <dd>{summary.average_score ?? 'Not scored yet'}</dd>
+        </div>
+        <div>
+          <dt>Answered</dt>
+          <dd>
+            {summary.answered_questions}/{summary.total_questions}
+          </dd>
+        </div>
+        <div>
+          <dt>Completed</dt>
+          <dd>{String(summary.completed)}</dd>
+        </div>
+      </dl>
+      <div className="feedback-columns">
+        <FeedbackList title="Weak categories" items={summary.weak_categories} />
+        <FeedbackList title="Strong categories" items={summary.strong_categories} />
+      </div>
     </div>
   )
 }

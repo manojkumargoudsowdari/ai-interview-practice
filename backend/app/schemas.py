@@ -98,6 +98,71 @@ class QuestionBankStoreResponse(BaseModel):
     preview: List[QuestionBankItem] = Field(default_factory=list)
 
 
+class PracticeSessionStartRequest(BaseModel):
+    category_filter: Optional[str] = None
+    difficulty_filter: Optional[str] = None
+    max_questions: int = 10
+    shuffle: bool = True
+
+
+class PracticeSessionQuestion(BaseModel):
+    id: str
+    category: str
+    difficulty: str
+    question: str
+    interviewer_intent: str
+    expected_answer_angle: str
+    follow_up_questions: List[str] = Field(default_factory=list)
+
+
+class PracticeSessionStartResponse(BaseModel):
+    session_id: str
+    total_questions: int
+    current_index: int
+    current_question: Optional[PracticeSessionQuestion]
+    message: str
+
+
+class PracticeAnswerSubmitRequest(BaseModel):
+    session_id: str
+    question_id: str
+    answer: str
+
+
+class PracticeAnswerScore(BaseModel):
+    score: float
+    strengths: List[str]
+    improvements: List[str]
+    improved_answer: str
+
+
+class PracticeAnswerSubmitResponse(BaseModel):
+    session_id: str
+    question_id: str
+    score: PracticeAnswerScore
+    next_question: Optional[PracticeSessionQuestion]
+    completed: bool
+    progress: str
+
+
+class PracticeSessionSummaryResponse(BaseModel):
+    session_id: str
+    total_questions: int
+    answered_questions: int
+    average_score: Optional[float]
+    weak_categories: List[str]
+    strong_categories: List[str]
+    history: List[dict]
+    completed: bool
+
+
+class PracticeSessionStoreResponse(BaseModel):
+    has_sessions: bool
+    total_sessions: int
+    latest_session_id: Optional[str]
+    latest_summary: Optional[PracticeSessionSummaryResponse]
+
+
 class AnswerScoringRequest(BaseModel):
     question: str
     answer: str
