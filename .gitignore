@@ -45,6 +45,7 @@ docker-compose.override.yml
 # Local uploaded/private practice data
 backend/data/uploads/*
 backend/data/processed/*
+backend/data/processed/question_bank.json
 !backend/data/uploads/.gitkeep
 !backend/data/processed/.gitkeep
 

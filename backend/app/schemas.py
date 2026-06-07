@@ -65,6 +65,39 @@ class PracticeContextResponse(BaseModel):
     job_description_preview: str
 
 
+class QuestionBankItem(BaseModel):
+    id: str
+    category: str
+    difficulty: str
+    question: str
+    interviewer_intent: str
+    expected_answer_angle: str
+    follow_up_questions: List[str] = Field(default_factory=list)
+
+
+class QuestionBankGenerateRequest(BaseModel):
+    total_questions: int = 55
+    difficulty: str = "mixed"
+    use_saved_context: bool = True
+    resume_context: Optional[str] = None
+    job_description: Optional[str] = None
+
+
+class QuestionBankGenerateResponse(BaseModel):
+    provider: str
+    total_questions: int
+    categories: List[str]
+    questions: List[QuestionBankItem]
+    warnings: List[str] = Field(default_factory=list)
+
+
+class QuestionBankStoreResponse(BaseModel):
+    has_question_bank: bool
+    total_questions: int
+    updated_at: Optional[str] = None
+    preview: List[QuestionBankItem] = Field(default_factory=list)
+
+
 class AnswerScoringRequest(BaseModel):
     question: str
     answer: str

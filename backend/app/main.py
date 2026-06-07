@@ -10,6 +10,9 @@ from app.schemas import (
     LLMHealthResponse,
     PracticeContextRequest,
     PracticeContextResponse,
+    QuestionBankGenerateRequest,
+    QuestionBankGenerateResponse,
+    QuestionBankStoreResponse,
     QuestionDetectionResponse,
     TranscriptRequest,
     UploadedDocumentResponse,
@@ -28,6 +31,8 @@ from app.services.document_processor import (
 )
 from app.services.cue_generator import generate_rule_based_cues
 from app.services.llm_service import generate_interview_cues, get_llm_health
+from app.services.question_bank_generator import generate_question_bank
+from app.services.question_bank_store import clear_question_bank, load_question_bank, save_question_bank
 from app.services.question_detector import detect_question
 from app.services.scoring import score_answer
 
@@ -164,3 +169,21 @@ def get_context_api():
 def clear_context_api():
     clear_context()
     return {"status": "context_cleared"}
+
+
+@app.post("/question-bank/generate", response_model=QuestionBankGenerateResponse)
+def generate_question_bank_api(request: QuestionBankGenerateRequest):
+    response = generate_question_bank(request)
+    save_question_bank(response)
+    return response
+
+
+@app.get("/question-bank", response_model=QuestionBankStoreResponse)
+def get_question_bank_api():
+    return load_question_bank()
+
+
+@app.delete("/question-bank")
+def clear_question_bank_api():
+    clear_question_bank()
+    return {"status": "question_bank_cleared"}
