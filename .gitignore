@@ -46,6 +46,7 @@ docker-compose.override.yml
 backend/data/uploads/*
 backend/data/processed/*
 backend/data/processed/question_bank.json
+backend/data/processed/practice_sessions.json
 !backend/data/uploads/.gitkeep
 !backend/data/processed/.gitkeep
 

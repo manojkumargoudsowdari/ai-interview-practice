@@ -21,32 +21,34 @@ def save_question_bank(response: QuestionBankGenerateResponse) -> None:
 
 
 def load_question_bank() -> QuestionBankStoreResponse:
-    if not QUESTION_BANK_PATH.exists():
+    response, updated_at = load_question_bank_response()
+    if response is None:
         return QuestionBankStoreResponse(
             has_question_bank=False,
             total_questions=0,
             updated_at=None,
             preview=[],
         )
+
+    return QuestionBankStoreResponse(
+        has_question_bank=bool(response.questions),
+        total_questions=len(response.questions),
+        updated_at=updated_at,
+        preview=response.questions[:10],
+    )
+
+
+def load_question_bank_response() -> tuple[QuestionBankGenerateResponse | None, str | None]:
+    if not QUESTION_BANK_PATH.exists():
+        return None, None
 
     try:
         with QUESTION_BANK_PATH.open("r", encoding="utf-8") as question_bank_file:
             payload: dict[str, Any] = json.load(question_bank_file)
     except (OSError, json.JSONDecodeError):
-        return QuestionBankStoreResponse(
-            has_question_bank=False,
-            total_questions=0,
-            updated_at=None,
-            preview=[],
-        )
+        return None, None
 
-    response = QuestionBankGenerateResponse.model_validate(payload)
-    return QuestionBankStoreResponse(
-        has_question_bank=bool(response.questions),
-        total_questions=len(response.questions),
-        updated_at=payload.get("updated_at"),
-        preview=response.questions[:10],
-    )
+    return QuestionBankGenerateResponse.model_validate(payload), payload.get("updated_at")
 
 
 def clear_question_bank() -> None:
