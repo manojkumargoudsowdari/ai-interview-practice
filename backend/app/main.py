@@ -26,6 +26,8 @@ from app.schemas import (
     QuestionDetectionResponse,
     TranscriptRequest,
     UploadedDocumentResponse,
+    VoicePracticeRequest,
+    VoicePracticeResponse,
 )
 from app.services.context_store import (
     clear_context,
@@ -286,6 +288,39 @@ def generate_practice_answer_api(request: PracticeAnswerGenerateRequest):
         return generate_practice_answer(request)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/voice-practice/process-transcript", response_model=VoicePracticeResponse)
+def process_voice_practice_transcript_api(request: VoicePracticeRequest):
+    transcript = request.transcript.strip()
+    if not transcript:
+        raise HTTPException(status_code=400, detail="Transcript cannot be empty.")
+
+    detection = detect_question(transcript)
+    if not detection.is_question or not detection.question:
+        return VoicePracticeResponse(
+            transcript=transcript,
+            detection=detection,
+            generated_answer=None,
+            message="Transcript was captured, but no interview question was detected.",
+        )
+
+    answer_request = PracticeAnswerGenerateRequest(
+        question=detection.question,
+        category=detection.category,
+        interviewer_intent="Answer the detected spoken interview question clearly.",
+        expected_answer_angle="direct answer, relevant experience or conceptual approach, tools, and impact",
+        use_saved_context=request.use_saved_context,
+        resume_context=request.resume_context,
+        job_description=request.job_description,
+    )
+    generated_answer = generate_practice_answer(answer_request)
+    return VoicePracticeResponse(
+        transcript=transcript,
+        detection=detection,
+        generated_answer=generated_answer,
+        message="Question detected and practice answer generated.",
+    )
 
 
 @app.get("/practice/session/{session_id}", response_model=PracticeSessionSummaryResponse)

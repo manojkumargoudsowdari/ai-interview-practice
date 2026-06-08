@@ -147,6 +147,20 @@ class PracticeAnswerGenerateResponse(BaseModel):
     warnings: List[str] = Field(default_factory=list)
 
 
+class VoicePracticeRequest(BaseModel):
+    transcript: str
+    use_saved_context: bool = True
+    resume_context: Optional[str] = None
+    job_description: Optional[str] = None
+
+
+class VoicePracticeResponse(BaseModel):
+    transcript: str
+    detection: QuestionDetectionResponse
+    generated_answer: Optional[PracticeAnswerGenerateResponse] = None
+    message: str
+
+
 class PracticeAnswerScore(BaseModel):
     score: float
     strengths: List[str]
