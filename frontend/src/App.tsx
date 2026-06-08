@@ -1,7 +1,36 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import './App.css'
 
 const API_BASE_URL = 'http://127.0.0.1:8000'
+
+type BrowserSpeechRecognitionEvent = {
+  resultIndex: number
+  results: ArrayLike<{
+    isFinal: boolean
+    0: {
+      transcript: string
+    }
+  }>
+}
+
+type BrowserSpeechRecognition = {
+  continuous: boolean
+  interimResults: boolean
+  lang: string
+  start: () => void
+  stop: () => void
+  onstart: (() => void) | null
+  onend: (() => void) | null
+  onerror: ((event: { error: string }) => void) | null
+  onresult: ((event: BrowserSpeechRecognitionEvent) => void) | null
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition?: new () => BrowserSpeechRecognition
+    webkitSpeechRecognition?: new () => BrowserSpeechRecognition
+  }
+}
 
 type BackendHealth = {
   app: string
@@ -126,6 +155,13 @@ type PracticeAnswerGenerateResponse = {
   warnings: string[]
 }
 
+type VoicePracticeResponse = {
+  transcript: string
+  detection: QuestionDetectionResponse
+  generated_answer: PracticeAnswerGenerateResponse | null
+  message: string
+}
+
 type PracticeSessionSummaryResponse = {
   session_id: string
   total_questions: number
@@ -202,6 +238,8 @@ async function readErrorDetail(response: Response): Promise<string> {
 }
 
 function App() {
+  const speechRecognitionRef = useRef<BrowserSpeechRecognition | null>(null)
+
   const [health, setHealth] = useState<BackendHealth | null>(null)
   const [healthError, setHealthError] = useState('')
   const [healthLoading, setHealthLoading] = useState(false)
@@ -274,6 +312,15 @@ function App() {
   const [scoreError, setScoreError] = useState('')
   const [scoreLoading, setScoreLoading] = useState(false)
 
+  const [voiceTranscript, setVoiceTranscript] = useState('')
+  const [voiceInterimTranscript, setVoiceInterimTranscript] = useState('')
+  const [voiceDetection, setVoiceDetection] = useState<QuestionDetectionResponse | null>(null)
+  const [voiceGeneratedAnswer, setVoiceGeneratedAnswer] = useState<PracticeAnswerGenerateResponse | null>(null)
+  const [voiceUseSavedContext, setVoiceUseSavedContext] = useState(true)
+  const [voiceError, setVoiceError] = useState('')
+  const [voiceListening, setVoiceListening] = useState(false)
+  const [voiceProcessing, setVoiceProcessing] = useState(false)
+
   async function checkBackend() {
     setHealthLoading(true)
     setHealthError('')
@@ -300,6 +347,111 @@ function App() {
     } finally {
       setLlmHealthLoading(false)
     }
+  }
+
+  function startVoiceCapture() {
+    setVoiceError('')
+    setVoiceDetection(null)
+    setVoiceGeneratedAnswer(null)
+    setVoiceInterimTranscript('')
+
+    const SpeechRecognitionConstructor = window.SpeechRecognition ?? window.webkitSpeechRecognition
+    if (!SpeechRecognitionConstructor) {
+      setVoiceError('Speech recognition is not supported in this browser. Use Chrome or Edge on localhost.')
+      return
+    }
+
+    const recognition = new SpeechRecognitionConstructor()
+    recognition.continuous = true
+    recognition.interimResults = true
+    recognition.lang = 'en-US'
+
+    recognition.onstart = () => setVoiceListening(true)
+    recognition.onend = () => {
+      setVoiceListening(false)
+      setVoiceInterimTranscript('')
+    }
+    recognition.onerror = (event) => {
+      setVoiceListening(false)
+      setVoiceError(`Microphone transcription failed: ${event.error}`)
+    }
+    recognition.onresult = (event) => {
+      let finalText = ''
+      let interimText = ''
+
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        const result = event.results[index]
+        const text = result[0].transcript
+
+        if (result.isFinal) {
+          finalText += `${text} `
+        } else {
+          interimText += text
+        }
+      }
+
+      if (finalText.trim()) {
+        setVoiceTranscript((current) => `${current} ${finalText}`.replace(/\s+/g, ' ').trim())
+      }
+      setVoiceInterimTranscript(interimText.trim())
+    }
+
+    speechRecognitionRef.current = recognition
+    recognition.start()
+  }
+
+  function stopVoiceCapture() {
+    speechRecognitionRef.current?.stop()
+    speechRecognitionRef.current = null
+    setVoiceListening(false)
+  }
+
+  async function processVoiceTranscript() {
+    setVoiceProcessing(true)
+    setVoiceError('')
+
+    try {
+      const cleanTranscript = voiceTranscript.trim()
+      if (!cleanTranscript) {
+        throw new Error('Record or type the interviewer question first.')
+      }
+
+      const result = await apiRequest<VoicePracticeResponse>('/voice-practice/process-transcript', {
+        method: 'POST',
+        body: JSON.stringify({
+          transcript: cleanTranscript,
+          use_saved_context: voiceUseSavedContext,
+        }),
+      })
+
+      setVoiceDetection(result.detection)
+      setVoiceGeneratedAnswer(result.generated_answer)
+      setTranscript(result.transcript)
+      setDetectedQuestion(result.detection)
+
+      const question = result.detection.question ?? result.transcript
+      setCueQuestion(question)
+      setScoreQuestion(question)
+
+      if (result.generated_answer) {
+        setCandidateAnswer(result.generated_answer.answer)
+      }
+    } catch (error) {
+      setVoiceDetection(null)
+      setVoiceGeneratedAnswer(null)
+      setVoiceError(error instanceof Error ? error.message : 'Voice question processing failed.')
+    } finally {
+      setVoiceProcessing(false)
+    }
+  }
+
+  function clearVoicePractice() {
+    stopVoiceCapture()
+    setVoiceTranscript('')
+    setVoiceInterimTranscript('')
+    setVoiceDetection(null)
+    setVoiceGeneratedAnswer(null)
+    setVoiceError('')
   }
 
   async function uploadResume() {
@@ -707,6 +859,91 @@ function App() {
               <dd>{health.status}</dd>
             </div>
           </dl>
+        )}
+      </section>
+
+      <section className="panel">
+        <div className="section-heading">
+          <div>
+            <h2>Live Audio Question</h2>
+            <p>Capture a spoken interviewer question, detect it, and generate a practice answer.</p>
+          </div>
+          <div className="button-row">
+            <button type="button" onClick={startVoiceCapture} disabled={voiceListening}>
+              {voiceListening ? 'Listening...' : 'Start Listening'}
+            </button>
+            <button type="button" onClick={stopVoiceCapture} disabled={!voiceListening}>
+              Stop
+            </button>
+            <button type="button" onClick={processVoiceTranscript} disabled={voiceProcessing || voiceListening}>
+              {voiceProcessing ? 'Generating...' : 'Generate Answer'}
+            </button>
+            <button className="danger-button" type="button" onClick={clearVoicePractice}>
+              Clear
+            </button>
+          </div>
+        </div>
+
+        <label className="checkbox-row">
+          <input
+            checked={voiceUseSavedContext}
+            type="checkbox"
+            onChange={(event) => setVoiceUseSavedContext(event.target.checked)}
+          />
+          Use saved resume/JD context
+        </label>
+
+        <label>
+          Captured question transcript
+          <textarea
+            value={voiceTranscript}
+            onChange={(event) => setVoiceTranscript(event.target.value)}
+            rows={4}
+            placeholder="Click Start Listening, ask the question, then click Stop."
+          />
+        </label>
+
+        {voiceInterimTranscript && (
+          <p className="listening-text">
+            Listening: {voiceInterimTranscript}
+          </p>
+        )}
+
+        {voiceError && <p className="error-message">{voiceError}</p>}
+
+        {voiceDetection && (
+          <dl className="result-grid">
+            <div>
+              <dt>is_question</dt>
+              <dd>{String(voiceDetection.is_question)}</dd>
+            </div>
+            <div>
+              <dt>question</dt>
+              <dd>{voiceDetection.question ?? 'None'}</dd>
+            </div>
+            <div>
+              <dt>category</dt>
+              <dd>{voiceDetection.category ?? 'None'}</dd>
+            </div>
+            <div>
+              <dt>topic</dt>
+              <dd>{voiceDetection.topic ?? 'None'}</dd>
+            </div>
+          </dl>
+        )}
+
+        {voiceGeneratedAnswer && (
+          <div className="generated-answer">
+            <dl className="compact-meta">
+              <div>
+                <dt>Provider</dt>
+                <dd>{voiceGeneratedAnswer.provider}</dd>
+              </div>
+            </dl>
+            <h3>Generated answer to read aloud</h3>
+            <p>{voiceGeneratedAnswer.answer}</p>
+            <CueList title="Warnings" items={voiceGeneratedAnswer.warnings} tone="risk" />
+          </div>
         )}
       </section>
 

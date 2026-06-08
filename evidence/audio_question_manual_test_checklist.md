@@ -1,0 +1,21 @@
+# Audio Question Practice Manual Test Checklist
+
+- [ ] Backend starts.
+- [ ] Frontend starts.
+- [ ] Browser is Chrome or Edge.
+- [ ] Backend health check works.
+- [ ] LLM health check works.
+- [ ] Resume/JD context is saved.
+- [ ] Live Audio Question section appears.
+- [ ] Start Listening requests microphone permission.
+- [ ] Spoken question is transcribed into the textarea.
+- [ ] Stop listening works.
+- [ ] Transcript can be manually edited.
+- [ ] Generate Answer detects the question.
+- [ ] Generated answer appears.
+- [ ] Provider is displayed.
+- [ ] Generated answer is copied into the normal Answer Scoring section.
+- [ ] Unsupported browser shows a clear error.
+- [ ] Backend compile passes.
+- [ ] Frontend build passes.
+- [ ] Frontend lint passes.
