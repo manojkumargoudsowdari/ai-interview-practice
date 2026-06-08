@@ -120,6 +120,12 @@ type PracticeAnswerSubmitResponse = {
   progress: string
 }
 
+type PracticeAnswerGenerateResponse = {
+  provider: string
+  answer: string
+  warnings: string[]
+}
+
 type PracticeSessionSummaryResponse = {
   session_id: string
   total_questions: number
@@ -237,6 +243,9 @@ function App() {
   const [practiceCurrentQuestion, setPracticeCurrentQuestion] = useState<PracticeSessionQuestion | null>(null)
   const [practiceTotalQuestions, setPracticeTotalQuestions] = useState(0)
   const [practiceAnswer, setPracticeAnswer] = useState('')
+  const [practiceGeneratedAnswer, setPracticeGeneratedAnswer] = useState<PracticeAnswerGenerateResponse | null>(null)
+  const [practiceAnswerGenerating, setPracticeAnswerGenerating] = useState(false)
+  const [practiceAnswerGenerateError, setPracticeAnswerGenerateError] = useState('')
   const [practiceScore, setPracticeScore] = useState<PracticeAnswerSubmitResponse | null>(null)
   const [practiceSummary, setPracticeSummary] = useState<PracticeSessionSummaryResponse | null>(null)
   const [practiceStore, setPracticeStore] = useState<PracticeSessionStoreResponse | null>(null)
@@ -469,6 +478,8 @@ function App() {
       setPracticeCurrentQuestion(result.current_question)
       setPracticeTotalQuestions(result.total_questions)
       setPracticeAnswer('')
+      setPracticeGeneratedAnswer(null)
+      setPracticeAnswerGenerateError('')
       setPracticeScore(null)
       setPracticeSummary(null)
       setPracticeStore(null)
@@ -476,6 +487,38 @@ function App() {
       setPracticeError(error instanceof Error ? error.message : 'Practice session start failed.')
     } finally {
       setPracticeLoading(false)
+    }
+  }
+
+  async function generatePracticeAnswer() {
+    setPracticeAnswerGenerating(true)
+    setPracticeAnswerGenerateError('')
+
+    try {
+      if (!practiceCurrentQuestion) {
+        throw new Error('Start a practice session and load a question first.')
+      }
+
+      const result = await apiRequest<PracticeAnswerGenerateResponse>('/practice/generate-answer', {
+        method: 'POST',
+        body: JSON.stringify({
+          question: practiceCurrentQuestion.question,
+          category: practiceCurrentQuestion.category,
+          difficulty: practiceCurrentQuestion.difficulty,
+          interviewer_intent: practiceCurrentQuestion.interviewer_intent,
+          expected_answer_angle: practiceCurrentQuestion.expected_answer_angle,
+          follow_up_questions: practiceCurrentQuestion.follow_up_questions,
+          use_saved_context: true,
+        }),
+      })
+
+      setPracticeGeneratedAnswer(result)
+      setPracticeAnswer(result.answer)
+    } catch (error) {
+      setPracticeGeneratedAnswer(null)
+      setPracticeAnswerGenerateError(error instanceof Error ? error.message : 'Practice answer generation failed.')
+    } finally {
+      setPracticeAnswerGenerating(false)
     }
   }
 
@@ -499,6 +542,8 @@ function App() {
       setPracticeScore(result)
       setPracticeCurrentQuestion(result.next_question)
       setPracticeAnswer('')
+      setPracticeGeneratedAnswer(null)
+      setPracticeAnswerGenerateError('')
 
       if (result.completed) {
         setPracticeSummary(await apiRequest<PracticeSessionSummaryResponse>(`/practice/session/${practiceSessionId}`))
@@ -520,6 +565,8 @@ function App() {
       setPracticeSummary(result.latest_summary)
       setPracticeSessionId(result.latest_session_id ?? '')
       setPracticeCurrentQuestion(null)
+      setPracticeGeneratedAnswer(null)
+      setPracticeAnswerGenerateError('')
       setPracticeScore(null)
     } catch (error) {
       setPracticeStore(null)
@@ -539,6 +586,8 @@ function App() {
       setPracticeCurrentQuestion(null)
       setPracticeTotalQuestions(0)
       setPracticeAnswer('')
+      setPracticeGeneratedAnswer(null)
+      setPracticeAnswerGenerateError('')
       setPracticeScore(null)
       setPracticeSummary(null)
       setPracticeStore(await apiRequest<PracticeSessionStoreResponse>('/practice/sessions'))
@@ -738,6 +787,28 @@ function App() {
         {practiceCurrentQuestion && (
           <div className="practice-session-layout">
             <PracticeQuestionCard question={practiceCurrentQuestion} />
+            <div className="practice-answer-tools">
+              <button type="button" onClick={generatePracticeAnswer} disabled={practiceAnswerGenerating || practiceLoading}>
+                {practiceAnswerGenerating ? 'Generating...' : 'Generate Answer'}
+              </button>
+              <p className="helper-text">
+                Generates a safe read-aloud draft from the current question and saved resume/JD context.
+              </p>
+            </div>
+            {practiceAnswerGenerateError && <p className="error-message">{practiceAnswerGenerateError}</p>}
+            {practiceGeneratedAnswer && (
+              <div className="generated-answer">
+                <dl className="compact-meta">
+                  <div>
+                    <dt>Provider</dt>
+                    <dd>{practiceGeneratedAnswer.provider}</dd>
+                  </div>
+                </dl>
+                <h3>Generated practice answer</h3>
+                <p>{practiceGeneratedAnswer.answer}</p>
+                <CueList title="Warnings" items={practiceGeneratedAnswer.warnings} tone="risk" />
+              </div>
+            )}
             <label>
               My answer
               <textarea value={practiceAnswer} onChange={(event) => setPracticeAnswer(event.target.value)} rows={6} />

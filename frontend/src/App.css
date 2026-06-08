@@ -298,6 +298,31 @@ dd {
   gap: 14px;
 }
 
+.practice-answer-tools {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.practice-answer-tools .helper-text {
+  margin: 0;
+}
+
+.generated-answer {
+  background: #f7f9fb;
+  border: 1px solid #dfe6ed;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.generated-answer p {
+  color: #23313f;
+  line-height: 1.6;
+  margin-bottom: 0;
+  white-space: pre-wrap;
+}
+
 .practice-question-card {
   background: #f7f9fb;
 }
@@ -499,6 +524,11 @@ dd {
   }
 
   .button-row {
+    flex-direction: column;
+  }
+
+  .practice-answer-tools {
+    align-items: stretch;
     flex-direction: column;
   }
 
