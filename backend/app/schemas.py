@@ -129,6 +129,24 @@ class PracticeAnswerSubmitRequest(BaseModel):
     answer: str
 
 
+class PracticeAnswerGenerateRequest(BaseModel):
+    question: str
+    category: Optional[str] = None
+    difficulty: Optional[str] = None
+    interviewer_intent: Optional[str] = None
+    expected_answer_angle: Optional[str] = None
+    follow_up_questions: List[str] = Field(default_factory=list)
+    use_saved_context: bool = True
+    resume_context: Optional[str] = None
+    job_description: Optional[str] = None
+
+
+class PracticeAnswerGenerateResponse(BaseModel):
+    provider: str
+    answer: str
+    warnings: List[str] = Field(default_factory=list)
+
+
 class PracticeAnswerScore(BaseModel):
     score: float
     strengths: List[str]

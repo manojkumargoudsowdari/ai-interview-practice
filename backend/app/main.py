@@ -8,6 +8,8 @@ from app.schemas import (
     CueGenerationRequest,
     CueGenerationResponse,
     LLMHealthResponse,
+    PracticeAnswerGenerateRequest,
+    PracticeAnswerGenerateResponse,
     PracticeAnswerScore,
     PracticeAnswerSubmitRequest,
     PracticeAnswerSubmitResponse,
@@ -32,6 +34,7 @@ from app.services.context_store import (
     update_job_description_context,
     update_resume_context,
 )
+from app.services.answer_generator import generate_practice_answer
 from app.services.document_processor import (
     DocumentProcessingError,
     process_text_payload,
@@ -275,6 +278,14 @@ def submit_practice_answer_api(request: PracticeAnswerSubmitRequest):
         completed=bool(session.get("completed", False)),
         progress=f"{answered}/{total}",
     )
+
+
+@app.post("/practice/generate-answer", response_model=PracticeAnswerGenerateResponse)
+def generate_practice_answer_api(request: PracticeAnswerGenerateRequest):
+    try:
+        return generate_practice_answer(request)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.get("/practice/session/{session_id}", response_model=PracticeSessionSummaryResponse)
